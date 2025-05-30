@@ -80,6 +80,29 @@ def get_twitter_ids_from_gist(session, url, headers, proxies=None):
         print("Failed to decode JSON from Gist.")
         return None
 
+def load_users_from_initial_block_file(filepath):
+    """Loads Twitter IDs and usernames from a previously saved ids_to_block file."""
+    print(f"Loading Twitter IDs and usernames from file: {filepath}")
+    users_to_block = []
+    if not os.path.exists(filepath):
+        print(f"Error: Specified file '{filepath}' does not exist.")
+        return None
+    try:
+        with open(filepath, 'r') as f:
+            for line in f:
+                parts = line.strip().split(',', 1)
+                if len(parts) == 2:
+                    users_to_block.append({'id': parts[0], 'username': parts[1]})
+                elif len(parts) == 1:
+                    users_to_block.append({'id': parts[0], 'username': 'N/A'})
+                else:
+                    print(f"Warning: Skipping malformed line in {filepath}: {line.strip()}")
+        print(f"Loaded {len(users_to_block)} users from '{filepath}'.")
+        return users_to_block
+    except Exception as e:
+        print(f"Error reading from file '{filepath}': {e}")
+        return None
+    
 def save_users_to_file(users, filename):
     """Saves a list of user dicts (id and username) to a file."""
     with open(filename, 'w') as f:
@@ -148,6 +171,11 @@ def main():
         type=str,
         help='Path to a Netscape formatted file to read/write cookies from/to. E.g., cookies.txt'
     )
+    parser.add_argument(
+        '--file',
+        type=str,
+        help='Path to an existing "ids_to_block_YYYYMMDD_HHMMSS.txt" file to read block list from file instead of requesting from the web.'
+    )
     args = parser.parse_args()
 
     # Setup proxy
@@ -178,11 +206,15 @@ def main():
     else:
         print("No cookie file specified. Using session cookies only (will not persist).")
 
+    # Determine source of users to block
+    users_to_block = []
+    if args.file:
+        all_users_to_block = load_users_from_initial_block_file(args.file)
+    else:
+        all_users_to_block = get_twitter_ids_from_gist(session, GIST_URL, HEADERS_FOR_GIST, proxies)
 
-    # 1. Get Twitter IDs and Usernames from Gist
-    all_users_to_block = get_twitter_ids_from_gist(session, GIST_URL, HEADERS_FOR_GIST, proxies)
     if not all_users_to_block:
-        print("No Twitter users retrieved. Exiting.")
+        print("No Twitter users retrieved/loaded. Exiting.")
         # Save cookies even if no users, if file was specified
         if cookie_jar:
             try:
@@ -192,10 +224,13 @@ def main():
                 print(f"Error saving cookies to {args.cookies}: {e}")
         return
 
-    # Save initial list with datetime
-    current_time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    initial_ids_filename = f"ids_to_block_{current_time_str}.txt"
-    save_users_to_file(all_users_to_block, initial_ids_filename)
+    # If reading from web, save a timestamped file for future use
+    if not args.file:
+        current_time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        initial_ids_filename = f"ids_to_block_{current_time_str}.txt"
+        save_users_to_file(all_users_to_block, initial_ids_filename)
+    else:
+        print(f"Using block list from '{args.file}'. No new list saved.")
 
     # 2. Load already processed IDs (only IDs for set lookup)
     succeeded_ids_set = load_processed_ids_from_file(SUCCESS_FILE)
