@@ -2,6 +2,7 @@
 
 > 🛑 A script to block the Loudest(Loudtardio accounts) that polluting your feed on X (formerly Twitter).
 
+![Demo](demo.gif)
 **BlockLoudest** is a simple automation tool that helps you instantly block "Loudtardio" accounts — the ones yelling/shitpoting all day with low effort, just to setup posting tickers/ads on your screen later, they are basiclly just CT ads.
 
 ## 🧠 How It Works
